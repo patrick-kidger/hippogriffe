@@ -1,0 +1,20 @@
+{%- macro bases(obj) -%}
+  {%- if obj.extra.hippogriffe.public_bases -%}
+    (
+    {%- for base, autoref in obj.extra.hippogriffe.public_bases -%}
+      {%- if autoref -%}
+        <autoref identifier="{{ base }}">{{ base }}</autoref>
+      {%- else -%}
+        {{ base }}
+      {%- endif -%}
+      {%- if not loop.last %}, {% endif -%}
+    {%- endfor -%}
+    )
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro url(obj) -%}
+  {%- if obj.extra.hippogriffe.url -%}
+    <a href="{{ obj.extra.hippogriffe.url }}"><code class='hippogriffe-repo-url'></code></a>
+  {%- endif -%}
+{%- endmacro -%}

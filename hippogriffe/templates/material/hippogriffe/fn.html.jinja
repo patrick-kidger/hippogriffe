@@ -1,0 +1,7 @@
+{% extends "_base/function.html.jinja" %}
+{% import "hippogriffe/hippogriffe.jinja" as hippogriffe %}
+
+{% block heading %}
+  {{ super() }}
+  {{ hippogriffe.url(function) }}
+{% endblock heading %}
