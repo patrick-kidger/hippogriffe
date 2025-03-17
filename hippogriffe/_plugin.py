@@ -12,6 +12,10 @@ from mkdocstrings import AutoDocProcessor
 
 
 _here = pathlib.Path(__file__).resolve().parent
+_regex = re.compile(
+    r"^\s*" + AutoDocProcessor.regex.pattern.removeprefix("^"),
+    AutoDocProcessor.regex.flags,
+)
 
 
 class PluginConfig(Config):
@@ -102,7 +106,7 @@ class HippogriffePlugin(BasePlugin[PluginConfig]):
         top_level_public_api.remove("")
         for file in files:
             if file.is_documentation_page():
-                for match in AutoDocProcessor.regex.finditer(file.content_string):
+                for match in _regex.finditer(file.content_string):
                     top_level_public_api.add(match["name"])
         files.append(
             File.generated(

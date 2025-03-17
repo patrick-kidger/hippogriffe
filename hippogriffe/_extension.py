@@ -23,6 +23,10 @@ def get_templates_path():
     return _here / "templates"
 
 
+class _NotInPublicApiException(Exception):
+    pass
+
+
 class _PublicApi:
     def __init__(
         self,
@@ -100,7 +104,8 @@ class _PublicApi:
             for m in self._public_modules:
                 if key.startswith(m + "."):
                     return key, False
-            raise Exception(
+            # Not using `KeyError` because that displays its message with `repr`.
+            raise _NotInPublicApiException(
                 f"Tried and failed to find {key} in the public API. Commons reasons "
                 "for this error are:\n"
                 "- If it is from outside this package, then that package is not listed "
@@ -216,7 +221,7 @@ def _collect_bases(
         elif isinstance(base, griffe.Class):
             try:
                 base, autoref = public_api[base.path]
-            except KeyError:
+            except _NotInPublicApiException:
                 bases.update(_collect_bases(base, public_api, public_modules))
             else:
                 bases[base] = autoref
@@ -283,7 +288,31 @@ class HippogriffeExtension(griffe.Extension):
     ) -> None:
         del agent, kwargs
         assert not isinstance(node, ast.AST)
-        func.extra["hippogriffe"]["signature"] = inspect.signature(node.obj)
+        signature = inspect.signature(node.obj)
+        try:
+            name = node.obj.__name__
+        except AttributeError:
+            pass
+        else:
+            if name == "__init__":
+                signature = signature.replace(return_annotation=inspect.Signature.empty)
+        func.extra["hippogriffe"]["signature"] = signature
+
+    def on_attribute_instance(
+        self,
+        *,
+        node: ast.AST | griffe.ObjectNode,
+        attr: griffe.Attribute,
+        agent: griffe.Visitor | griffe.Inspector,
+        **kwargs: Any,
+    ) -> None:
+        del node, agent, kwargs
+        # Knowing the value is IMO usually not useful. That is what documentation
+        # directly is for.
+        attr.value = None
+        # This is used to indicate that it is a module attribute, but IMO that's not
+        # super clear in the docs.
+        attr.labels.discard("module")
 
     def on_package_loaded(
         self, *, pkg: griffe.Module, loader: griffe.GriffeLoader, **kwargs: Any

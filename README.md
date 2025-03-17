@@ -7,6 +7,8 @@ This is a set of tweaks on top of the MkDocs + `mkdocstrings[python]` + `griffe`
     - Fixes unions/generics/etc. to display as e.g. `int | str` rather than just `Union`, or `tuple[int, str]` rather than just `tuple`.
     - Respects your public API: if a type is declared in your documentation as `::: yourlib.Foo` then its usage in type annotations will match: `some_fn(foo: yourlib.Foo)`.
 - Show base classes inline after the class.
+- Drops the `-> None` return annotation from `__init__` methods.
+- Attributes display as `[attr] somelib.someattr` instead of `[attr] somelib.someattr = some_value [module]`. (I don't find usually-long default values to be useful documentation, nor the 'module' tag to be informative.)
 
 Before                 | After
 :---------------------:|:----------------------:
