@@ -235,18 +235,6 @@ def _get_repo_url(repo_url: None | str) -> tuple[pathlib.Path, str]:
             "`hippogriffe.show_source_links` requires specifying a top-level "
             "`repo_url`."
         )
-    is_github = (
-        repo_url.removeprefix("https://")
-        .removeprefix("https://")
-        .startswith("github.com")
-    )
-    if not is_github:
-        # We need to format the `repo_url` to what the repo expects, so we have to
-        # hardcode this in.
-        raise ValueError(
-            "`hippogriffe.show_source_links` currently only supports "
-            "`repo_url: https://github.com/...`."
-        )
     try:
         git_head = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, check=False
@@ -264,9 +252,19 @@ def _get_repo_url(repo_url: None | str) -> tuple[pathlib.Path, str]:
     else:
         toplevel = pathlib.Path(git_toplevel.stdout.decode().strip())
         commit_hash = git_head.stdout.decode().strip()
-    repo_url = (
-        f"{repo_url.removesuffix('/')}/blob/{commit_hash}/{{path}}#L{{start}}-{{end}}"
-    )
+    raw_url = repo_url.removeprefix("https://").removeprefix("https://")
+    if raw_url.startswith("github.com") or raw_url.startswith("gitlab.com"):
+        repo_url = (
+            f"{repo_url.removesuffix('/')}/blob/{commit_hash}/{{path}}"
+            "#L{start}-{end}"
+        )
+    else:
+        # We need to format the `repo_url` to what the repo expects, so we have to
+        # hardcode this in.
+        raise ValueError(
+            "`hippogriffe.show_source_links` currently only supports "
+            "`repo_url: https://github.com/...` and `repo_url: https://gitlab.com/...`."
+        )
     return toplevel, repo_url
 
 
