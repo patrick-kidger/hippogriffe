@@ -18,7 +18,7 @@ dependencies = [
   "mkdocstrings[python]>=0.28.3",
   "wadler_lindig>=0.1.4"
 ]
-description = "A simple ipynb->md converter for MkDocs"
+description = "Tweaks for `mkdocstrings[python]`"
 keywords = ["mkdocs", "mkdocstrings", "griffe", "md", "markdown"]
 license = {file = "LICENSE"}
 name = "hippogriffe"
