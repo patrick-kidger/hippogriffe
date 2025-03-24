@@ -41,52 +41,54 @@ class _PublicApi:
         self._data: dict[str, list[str]] = {}
         self._builtin_modules = builtin_modules
         self._public_modules = stdlib_modules + extra_public_modules
-        seen: set[griffe.Alias | griffe.Object] = set()  # Don't infinite loop on cycles
+        # Don't infinite loop on cycles. We only store Objects, and not Aliases, as in
+        # cycles then the aliases with be distinct: `X.Y.X.Y` is not `X.Y`, though the
+        # underlying object is the same.
 
-        agenda: list[tuple[griffe.Alias | griffe.Object, bool]] = [(pkg, False)]
+        agenda: list[tuple[griffe.Object, bool]] = [(pkg, False)]
+        seen: set[griffe.Object] = {pkg}
         while len(agenda) > 0:
             item, force_public = agenda.pop()
-            seen.add(item)
-            # Skip private elements
-            if item.name.startswith("_") and not (
-                item.name.startswith("__") and item.name.endswith("__")
-            ):
-                continue
-            if isinstance(item, griffe.Alias):
-                try:
-                    final_item = item.final_target
-                except griffe.AliasResolutionError:
-                    continue
-                if item.name != final_item.name:
-                    # Renaming during import counts as private.
-                    # (In particular this happens for backward compatibility, e.g.
-                    # `equinox.nn.inference_mode` and `equinox.tree_inference`.)
-                    continue
-            else:
-                final_item = item
-
             toplevel_public = item.path in top_level_public_api
             if force_public or toplevel_public:
                 # If we're in the public API, then we consider all of our children to be
                 # in it as well... (this saves us from having to parse out `filters` and
                 # `members` from our documentation)
-                agenda.extend(
-                    (x, True) for x in item.all_members.values() if x not in seen
-                )
                 try:
-                    paths = self._data[final_item.path]
+                    paths = self._data[item.path]
                 except KeyError:
-                    paths = self._data[final_item.path] = []
+                    paths = self._data[item.path] = []
                 paths.append(item.path)
-                self._objects.add(final_item)
+                self._objects.add(item)
                 if toplevel_public:
-                    self._toplevel_objects.add(final_item)
+                    self._toplevel_objects.add(item)
+                sub_force_public = True
             else:
                 # ...if we're not in the public API then check our members -- some of
                 # them might be in the public API.
-                agenda.extend(
-                    (x, False) for x in item.all_members.values() if x not in seen
-                )
+                sub_force_public = False
+            for member in item.all_members.values():
+                # Skip private elements
+                if member.name.startswith("_") and not (
+                    member.name.startswith("__") and item.name.endswith("__")
+                ):
+                    continue
+                if isinstance(member, griffe.Alias):
+                    try:
+                        final_member = member.final_target
+                    except griffe.AliasResolutionError:
+                        continue
+                    if member.name != final_member.name:
+                        # Renaming during import counts as private.
+                        # (In particular this happens for backward compatibility, e.g.
+                        # `equinox.nn.inference_mode` and `equinox.tree_inference`.)
+                        continue
+                else:
+                    final_member = member
+                if final_member in seen:
+                    continue
+                agenda.append((final_member, sub_force_public))
+                seen.add(final_member)
 
     def toplevel(self) -> Iterable[griffe.Object]:
         return self._toplevel_objects
