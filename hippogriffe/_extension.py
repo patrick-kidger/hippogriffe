@@ -45,11 +45,11 @@ class _PublicApi:
         # cycles then the aliases with be distinct: `X.Y.X.Y` is not `X.Y`, though the
         # underlying object is the same.
 
-        agenda: list[tuple[griffe.Object, bool]] = [(pkg, False)]
+        agenda: list[tuple[griffe.Object, str, bool]] = [(pkg, pkg.path, False)]
         seen: set[griffe.Object] = {pkg}
         while len(agenda) > 0:
-            item, force_public = agenda.pop()
-            toplevel_public = item.path in top_level_public_api
+            item, public_path, force_public = agenda.pop()
+            toplevel_public = public_path in top_level_public_api
             if force_public or toplevel_public:
                 # If we're in the public API, then we consider all of our children to be
                 # in it as well... (this saves us from having to parse out `filters` and
@@ -58,7 +58,7 @@ class _PublicApi:
                     paths = self._data[item.path]
                 except KeyError:
                     paths = self._data[item.path] = []
-                paths.append(item.path)
+                paths.append(public_path)
                 self._objects.add(item)
                 if toplevel_public:
                     self._toplevel_objects.add(item)
@@ -70,7 +70,7 @@ class _PublicApi:
             for member in item.all_members.values():
                 # Skip private elements
                 if member.name.startswith("_") and not (
-                    member.name.startswith("__") and item.name.endswith("__")
+                    member.name.startswith("__") and member.name.endswith("__")
                 ):
                     continue
                 if isinstance(member, griffe.Alias):
@@ -87,7 +87,7 @@ class _PublicApi:
                     final_member = member
                 if final_member in seen:
                     continue
-                agenda.append((final_member, sub_force_public))
+                agenda.append((final_member, member.path, sub_force_public))
                 seen.add(final_member)
 
     def toplevel(self) -> Iterable[griffe.Object]:
