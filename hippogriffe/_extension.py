@@ -2,6 +2,7 @@ import ast
 import builtins
 import contextlib
 import functools as ft
+import importlib
 import inspect
 import pathlib
 import re
@@ -33,14 +34,29 @@ class _PublicApi:
         pkg: griffe.Module,
         top_level_public_api: set[str],
         builtin_modules: list[str],
-        stdlib_modules: list[str],
-        extra_public_modules: list[str],
+        extra_public_objects: list[str],
     ):
         self._objects: set[griffe.Object] = set()
         self._toplevel_objects: set[griffe.Object] = set()
         self._data: dict[str, list[str]] = {}
         self._builtin_modules = builtin_modules
-        self._public_modules = stdlib_modules + extra_public_modules
+        for object_path in extra_public_objects:
+            object_pieces = object_path.split(".")
+            for i in reversed(range(1, len(object_pieces))):
+                module_name = "".join(object_pieces[:i])
+                object_name = object_pieces[i:]
+                try:
+                    object = importlib.import_module(module_name)
+                except Exception:
+                    continue
+                for object_piece in object_name:
+                    object = getattr(object, object_piece)
+                private_path = f"{object.__module__}.{object.__qualname__}"
+                try:
+                    paths = self._data[private_path]
+                except KeyError:
+                    paths = self._data[private_path] = []
+                paths.append(object_path)
         # Don't infinite loop on cycles. We only store Objects, and not Aliases, as in
         # cycles then the aliases with be distinct: `X.Y.X.Y` is not `X.Y`, though the
         # underlying object is the same.
@@ -103,16 +119,17 @@ class _PublicApi:
             for m in self._builtin_modules:
                 if key.startswith(m + "."):
                     return key.removeprefix(m + "."), False
-            for m in self._public_modules:
+            for m in sys.stdlib_module_names:
                 if key.startswith(m + "."):
                     return key, False
-            # Not using `KeyError` because that displays its message with `repr`.
+            # Note that this message must not have any newlines in it, to display
+            # correctly.
             raise _NotInPublicApiException(
-                f"Tried and failed to find {key} in the public API. Commons reasons "
-                "for this error are:\n"
-                "- If it is from outside this package, then that package is not listed "
-                "under the `hippogriffe.extra_public_modules`\n"
-                "- If it is from inside this package, then it may have been written "
+                f"Tried and failed to find `{key}` in the public API. Commons reasons "
+                "for this error are (1) if it is from outside this package, then this "
+                "object is not listed (under whatever public path it should be "
+                "displayed as) in `hippogriffe.extra_public_objects`; (2) if it is "
+                "from inside this package, then it may have been written "
                 "`::: somelib.Foo:` with a trailing colon, when just `:::somelib.Foo` "
                 "is correct."
             ) from e
@@ -211,20 +228,17 @@ def _resolved_bases(cls: griffe.Class) -> list[str | griffe.Object]:
     return resolved_bases
 
 
-def _collect_bases(
-    cls: griffe.Class, public_api: _PublicApi, public_modules: set[str]
-) -> dict[str, bool]:
+def _collect_bases(cls: griffe.Class, public_api: _PublicApi) -> dict[str, bool]:
     bases: dict[str, bool] = {}
     for base in _resolved_bases(cls):
         if isinstance(base, str):
             # builtins case above
-            if "builtins" in public_modules:
-                bases[base] = False
+            bases[base] = False
         elif isinstance(base, griffe.Class):
             try:
                 base, autoref = public_api[base.path]
             except _NotInPublicApiException:
-                bases.update(_collect_bases(base, public_api, public_modules))
+                bases.update(_collect_bases(base, public_api))
             else:
                 bases[base] = autoref
     return bases
@@ -324,8 +338,7 @@ class HippogriffeExtension(griffe.Extension):
             pkg,
             top_level_public_api=self.top_level_public_api,
             builtin_modules=self.config.builtin_modules,
-            stdlib_modules=self.config.stdlib_modules,
-            extra_public_modules=self.config.extra_public_modules,
+            extra_public_objects=self.config.extra_public_objects,
         )
 
         def use_public_name(context: None | dict, obj: Any) -> None | wl.AbstractDoc:
@@ -342,21 +355,34 @@ class HippogriffeExtension(griffe.Extension):
                 new_path, _ = public_api[f"{obj.__module__}.{obj.__qualname__}"]
                 return wl.TextDoc(new_path)
 
-        public_modules = set(self.config.extra_public_modules) | set(
-            self.config.stdlib_modules
-        )
         for obj in public_api:
             if obj.is_function:
                 assert type(obj) is griffe.Function
-                obj.extra["mkdocstrings"]["template"] = "hippogriffe/fn.html.jinja"
-                _pretty_fn(obj, use_public_name)
+                try:
+                    _pretty_fn(obj, use_public_name)
+                except _NotInPublicApiException as e:
+                    # Defer error until later -- right now our `public_api` is an
+                    # overestimation of the 'true' public API as for a public class
+                    # `Foo` then we actually include all of its attributes in the public
+                    # API here, even if those aren't documented.
+                    # It's fairly common to have nonpublic annotations in nonpublic
+                    # methods, and we shouldn't die on those now -- if the method is
+                    # never documented then we don't need to worry. Putting this here is
+                    # totally sneaky, it's letting jinja think this is a template and
+                    # having it raise a TemplateNotFound error when it tries to format
+                    # this object.
+                    obj.extra["mkdocstrings"]["template"] = (
+                        f"{e} This arose whilst pretty-printing `{obj.path}`. You may "
+                        "ignore the rest of this error message, which comes from jinja."
+                        "                                                        "
+                    )
+                else:
+                    obj.extra["mkdocstrings"]["template"] = "hippogriffe/fn.html.jinja"
             elif obj.is_class:
                 assert type(obj) is griffe.Class
                 obj.extra["mkdocstrings"]["template"] = "hippogriffe/class.html.jinja"
                 if self.config.show_bases:
-                    public_bases = list(
-                        _collect_bases(obj, public_api, public_modules).items()
-                    )
+                    public_bases = list(_collect_bases(obj, public_api).items())
                     obj.extra["hippogriffe"]["public_bases"] = public_bases
 
         if self.config.show_source_links == "none":

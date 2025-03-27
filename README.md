@@ -43,9 +43,9 @@ plugins:
     - hippogriffe:
         show_bases: true/false
         show_source_links: all/toplevel/none
-        extra_public_modules:
-            - foo
-            - bar
+        extra_public_objects:
+            - foo.SomeClass
+            - bar.subpackage.some_function
 ```
 
 **show_bases:**
@@ -56,19 +56,21 @@ If `false` then base classes will not be displayed alongside a class. Defaults t
 
 Sets which objects will have links to their location in the repository (as configured via the usual MkDocs `repo_url`). If `all` then all objects will have links. If `toplevel` then just `::: somelib.value` will have links, but their members will not. If `none` then no links will be added. Defaults to `toplevel`.
 
-**extra_public_modules:**
+**extra_public_objects:**
 
-A list of module names whose elements should be treated as part of the public API. Pretty-formatting of type annotations is done strictly: every annotation must be part of the known public API, else an error will be raised. The public API is defined as the combination of:
+Pretty-formatting of type annotations is done strictly: every annotation must be part of the known public API, else an error will be raised. The public API is defined as the combination of:
 
 - Everything you document using `::: yourlib.Foo`, and all of their members.
 - Anything from the standard library.
-- All objects belonging to any of `extra_public_modules`.
+- All objects belonging to any of `extra_public_objects`.
 
 For example,
 ```yml
 plugins:
     - hippogriffe:
-        extra_public_modules:
-            - jax
-            - torch
+        extra_public_objects:
+            - jax.Array
+            - torch.Tensor
 ```
+
+List each object under whatever public path `somelib.Foo` that you would like it to be displayed under (and from which it must be accessilbe), not whatever private path `somelib._internal.foo.Foo` it is defined at.

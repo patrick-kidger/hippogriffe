@@ -1,6 +1,5 @@
 import pathlib
 import re
-import sys
 import typing
 
 from mkdocs.config import Config
@@ -25,13 +24,8 @@ class PluginConfig(Config):
     show_source_links = Choice(["all", "toplevel", "none"], default="toplevel")
     """Whether to include [source] links to the repo."""
 
-    extra_public_modules = Type(list, default=[])
-    """Any third-party modules whose objects are allowed in the public API."""
-
-    stdlib_modules = Type(list, default=list(sys.stdlib_module_names))
-    """A list of stdlib modules. This is concatenated with `extra_public_modules` to
-    form the list of external modules that are allowed in the public API
-    """
+    extra_public_objects = Type(list, default=[])
+    """Any third-party objects which are allowed in the public API."""
 
     builtin_modules = Type(
         list, default=["builtins", "collections.abc", "typing", "typing_extensions"]
