@@ -268,10 +268,12 @@ def _get_repo_url(repo_url: None | str) -> tuple[pathlib.Path, str]:
     else:
         toplevel = pathlib.Path(git_toplevel.stdout.decode().strip())
         commit_hash = git_head.stdout.decode().strip()
-    raw_url = repo_url.removeprefix("https://").removeprefix("https://")
+    raw_url = repo_url.removeprefix("https://").removesuffix('/')
     if raw_url.startswith("github.com") or raw_url.startswith("gitlab.com"):
+        # expect url in the form `https://github.com/org/repo`, strip any trailing paths
+        raw_url = "/".join(raw_url.split("/")[:3])
         repo_url = (
-            f"{repo_url.removesuffix('/')}/blob/{commit_hash}/{{path}}"
+            f"https://{raw_url}/blob/{commit_hash}/{{path}}"
             "#L{start}-{end}"
         )
     else:
