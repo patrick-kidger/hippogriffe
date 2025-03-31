@@ -92,7 +92,7 @@ class _PublicApi:
                 if isinstance(member, griffe.Alias):
                     try:
                         final_member = member.final_target
-                    except griffe.AliasResolutionError:
+                    except (griffe.AliasResolutionError, griffe.CyclicAliasError):
                         continue
                     if member.name != final_member.name:
                         # Renaming during import counts as private.
