@@ -273,11 +273,18 @@ def _get_repo_url(repo_url: None | str) -> tuple[pathlib.Path, str]:
         protocol = f"{protocol}://"
     else:
         protocol = ""
-    if repo_url.startswith("github.com") or repo_url.startswith("gitlab.com"):
+    supported_site = False
+    if repo_url.startswith("github.com"):
+        supported_site = True
+        fragment = "L{start}-L{end}"
+    elif repo_url.startswith("gitlab.com"):
+        supported_site = True
+        fragment = "L{start}-{end}"
+    if supported_site:
         # Expect url in the form `https://github.com/org/repo`, strip any trailing paths
         repo_url = "/".join(repo_url.split("/")[:3])
         repo_url = (
-            f"{protocol}{repo_url}/blob/{commit_hash}/{{path}}#L{{start}}-{{end}}"
+            f"{protocol}{repo_url}/blob/{commit_hash}/{{path}}#{fragment}"
         )
     else:
         # We need to format the `repo_url` to what the repo expects, so we have to
