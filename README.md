@@ -73,4 +73,4 @@ plugins:
             - torch.Tensor
 ```
 
-List each object under whatever public path `somelib.Foo` that you would like it to be displayed under (and from which it must be accessilbe), not whatever private path `somelib._internal.foo.Foo` it is defined at.
+List each object under whatever public path `somelib.Foo` that you would like it to be displayed under (and from which it must be accessible), not whichever private path `somelib._internal.foo.Foo` it is defined at.
