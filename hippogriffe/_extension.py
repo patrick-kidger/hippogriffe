@@ -283,9 +283,7 @@ def _get_repo_url(repo_url: None | str) -> tuple[pathlib.Path, str]:
     if supported_site:
         # Expect url in the form `https://github.com/org/repo`, strip any trailing paths
         repo_url = "/".join(repo_url.split("/")[:3])
-        repo_url = (
-            f"{protocol}{repo_url}/blob/{commit_hash}/{{path}}#{fragment}"
-        )
+        repo_url = f"{protocol}{repo_url}/blob/{commit_hash}/{{path}}#{fragment}"
     else:
         # We need to format the `repo_url` to what the repo expects, so we have to
         # hardcode this in.
@@ -363,7 +361,11 @@ class HippogriffeExtension(griffe.Extension):
                 with contextlib.suppress(BaseException):
                     obj = eval(obj, context)
             # Then if it's in the public API, convert it over.
-            if isinstance(obj, type) and obj is not type(None):
+            if (
+                isinstance(obj, type)
+                and obj is not type(None)
+                and not hasattr(obj, "__pdoc__")
+            ):
                 new_path, _ = public_api[f"{obj.__module__}.{obj.__qualname__}"]
                 return wl.TextDoc(new_path)
 
